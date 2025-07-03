@@ -1,8 +1,10 @@
+require('dotenv').config();
 const express=require('express');
 const app=express()
 const cors=require('cors')
 app.use(cors())
 const session = require('express-session');
+
 app.use(session({
   secret: 'ashok-secret-key',
   resave: false,
@@ -11,6 +13,7 @@ app.use(session({
     maxAge: 2 * 60 * 1000 // 2 minutes
   }
 }));
+const port=process.env.PORT||2000;
 const dbconnect=require('./config/conn')
 const router=require('./routes/routes')
 const path=require('path');
@@ -24,6 +27,6 @@ app.use(express.json())
 app.get('/',(req,res)=>{
     res.render("material")
 })
-app.listen(2000,()=>{
+app.listen(port,()=>{
     console.log("server coonection is successfully")
 })  
