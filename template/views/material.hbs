@@ -1,0 +1,183 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>EduMaterials - View & Upload PDFs</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+</head>
+<body class="bg-gray-100">
+
+  <!-- Navbar -->
+  <nav class="bg-white shadow-md p-4 flex justify-between items-center">
+    <h1 class="text-xl font-bold text-blue-600">EduMaterials</h1>
+    <div>
+      <a href="#" id="openLogin" class="text-sm text-blue-500 hover:underline mr-4">Admin Login</a>
+      <a href="#" id="openUpload" class="text-sm text-green-600 hover:underline hidden">Upload PDF</a>
+    </div>
+  </nav>
+
+  <!-- Image Banner -->
+  <div class="max-w-lg mx-auto mt-6">
+    <img class="w-full mb-6 rounded" src="https://plus.unsplash.com/premium_photo-1664372145591-f7cc308ff5da?q=80&w=1992&auto=format&fit=crop&ixlib=rb-4.1.0&ixid=M3wxMjA3fDB8MHxwaG90by1wYWdlfHx8fGVufDB8fHx8fA%3D%3D" alt="Material" />
+  </div>
+
+  <!-- Selection Panel -->
+  <div class="max-w-lg mx-auto mt-4 bg-white p-6 rounded shadow">
+    <label class="block mb-2 font-medium">Select Semester</label>
+    <select id="semesterSelect" class="w-full border p-2 mb-4 rounded"></select>
+
+    <label class="block mb-2 font-medium">Select Subject</label>
+    <select id="subjectSelect" class="w-full border p-2 mb-4 rounded" disabled></select>
+  </div>
+
+  <!-- PDF List -->
+  <div id="pdfList" class="max-w-lg mx-auto mt-4"></div>
+
+  <!-- PDF Viewer Modal -->
+<div id="pdfModal" class="fixed inset-0 bg-black bg-opacity-80 hidden z-50 flex items-center justify-center">
+  <div class="relative bg-white w-full h-full rounded-lg flex flex-col">
+    <button id="closePdf" class="absolute top-4 right-6 bg-red-600 text-white px-4 py-1 rounded z-50 hover:bg-red-700 transition">
+      Close
+    </button>
+    <iframe id="pdfFrame" class="w-full h-full mt-12" style="border: none;"></iframe>
+  </div>
+</div>
+
+
+  <!-- Upload Modal -->
+  <div id="uploadModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white w-full max-w-md p-6 rounded shadow relative">
+      <button id="closeUpload" class="absolute top-2 right-4 bg-red-500 text-white px-3 py-1 rounded">Close</button>
+      <h2 class="text-xl font-bold text-center mb-4">Upload PDF</h2>
+      <form id="uploadForm" action="/api/upload" method="POST" enctype="multipart/form-data">
+        <label class="block mb-2">Enter Semester</label>
+        <input name="semesterName" type="text" placeholder="e.g., Semester 1" class="w-full border p-2 mb-4 rounded" required>
+
+        <label class="block mb-2">Enter Subject</label>
+        <input name="subjectName" type="text" placeholder="e.g., Mathematics" class="w-full border p-2 mb-4 rounded" required>
+
+        <label class="block mb-2">PDF Title</label>
+        <input name="title" type="text" placeholder="Enter Title" class="w-full border p-2 mb-4 rounded" required>
+
+        <label class="block mb-2">Choose PDF</label>
+        <input name="file" type="file" accept="application/pdf" class="mb-4" required>
+
+        <button type="submit" class="bg-blue-600 text-white px-4 py-2 rounded w-full">Upload</button>
+      </form>
+    </div>
+  </div>
+
+  <!-- Login Modal -->
+  <div id="loginModal" class="fixed inset-0 bg-black bg-opacity-50 hidden flex items-center justify-center z-50">
+    <div class="bg-white w-full max-w-sm p-6 rounded shadow relative">
+      <button id="closeLogin" class="absolute top-2 right-4 bg-red-500 text-white px-3 py-1 rounded">Close</button>
+      <h2 class="text-xl font-bold text-center mb-4">Admin Login</h2>
+      <form id="loginForm">
+        <label class="block mb-2">Username</label>
+        <input name="username" type="text" class="w-full border p-2 mb-4 rounded" required>
+
+        <label class="block mb-2">Password</label>
+        <input name="password" type="password" class="w-full border p-2 mb-4 rounded" required>
+
+        <button type="submit" class="bg-green-600 text-white px-4 py-2 rounded w-full">Login</button>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const semesterSelect = document.getElementById('semesterSelect');
+    const subjectSelect = document.getElementById('subjectSelect');
+    const pdfList = document.getElementById('pdfList');
+    const pdfModal = document.getElementById('pdfModal');
+    const pdfFrame = document.getElementById('pdfFrame');
+    const closePdf = document.getElementById('closePdf');
+
+    const uploadModal = document.getElementById('uploadModal');
+    const openUpload = document.getElementById('openUpload');
+    const closeUpload = document.getElementById('closeUpload');
+    const uploadForm = document.getElementById('uploadForm');
+
+    const loginModal = document.getElementById('loginModal');
+    const openLogin = document.getElementById('openLogin');
+    const closeLogin = document.getElementById('closeLogin');
+    const loginForm = document.getElementById('loginForm');
+
+    async function loadSemesters(selectEl) {
+      const res = await fetch('/api/semesters');
+      const data = await res.json();
+      selectEl.innerHTML = '<option value="">-- Select --</option>';
+      data.forEach(s => {
+        const opt = document.createElement('option');
+        opt.value = s._id;
+        opt.textContent = s.name;
+        selectEl.appendChild(opt);
+      });
+    }
+
+    window.onload = async () => {
+      await loadSemesters(semesterSelect);
+    };
+
+    semesterSelect.addEventListener('change', async () => {
+      if (!semesterSelect.value) {
+        subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+        subjectSelect.disabled = true;
+        pdfList.innerHTML = '';
+        return;
+      }
+
+      const res = await fetch(`/api/semesters/${semesterSelect.value}/subjects`);
+      const data = await res.json();
+      subjectSelect.innerHTML = '<option value="">-- Select Subject --</option>';
+      subjectSelect.disabled = false;
+      data.forEach(s => {
+        subjectSelect.innerHTML += `<option value="${s._id}">${s.name}</option>`;
+      });
+      pdfList.innerHTML = '';
+    });
+  subjectSelect.addEventListener('change', async () => {
+  const res = await fetch(`/api/subjects/${subjectSelect.value}/pdfs`);
+  const data = await res.json();
+  
+  // 🛠 CHANGED: Use gridFsFileId instead of _id
+  pdfList.innerHTML = data.map(p => `
+    <div class="bg-white p-4 rounded shadow mt-2 flex justify-between">
+      <span>${p.title}</span>
+      <button onclick="viewPdf('${p.gridFsFileId}')" class="bg-blue-500 text-white px-3 py-1 rounded">View</button>
+    </div>
+  `).join('');
+});
+
+    // ✅ Fix view URL to match /api/pdfs/:id/download
+   window.viewPdf = id => {
+    pdfFrame.src = `/api/pdfs/${id}/download`;
+    pdfModal.classList.remove('hidden');
+  };
+
+  // Close PDF viewer
+  closePdf.onclick = () => {
+    pdfModal.classList.add('hidden');
+    pdfFrame.src = '';
+  };
+    openUpload.onclick = () => uploadModal.classList.remove('hidden');
+    closeUpload.onclick = () => uploadModal.classList.add('hidden');
+
+    openLogin.onclick = () => loginModal.classList.remove('hidden');
+    closeLogin.onclick = () => loginModal.classList.add('hidden');
+
+    loginForm.addEventListener('submit', e => {
+      e.preventDefault();
+      const username = loginForm.username.value;
+      const password = loginForm.password.value;
+      if (username === 'Ashok' && password === 'ashok#2004') {
+        alert('Login successful!');
+        loginModal.classList.add('hidden');
+        openUpload.classList.remove('hidden');
+      } else {
+        alert('Invalid credentials!');
+      }
+    });
+  </script>
+</body>
+</html>
